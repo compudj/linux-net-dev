@@ -501,8 +501,19 @@ void icmp6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info,
 	if (__ipv6_addr_needs_scope_id(addr_type)) {
 		iif = icmp6_iif(skb);
 	} else {
-		dst = skb_dst(skb);
-		iif = l3mdev_master_ifindex(dst ? dst->dev : skb->dev);
+		struct net_device *route_lookup_dev = NULL;
+
+		/*
+		 * The device used for looking up which routing table to use is
+		 * preferably the source whenever it is set, which should
+		 * ensure the icmp error can be sent to the source host, else
+		 * fallback on the destination device.
+		 */
+		if (skb->dev)
+			route_lookup_dev = skb->dev;
+		else if (skb_dst(skb))
+			route_lookup_dev = skb_dst(skb)->dev;
+		iif = l3mdev_master_ifindex(route_lookup_dev);
 	}
 
 	/*
